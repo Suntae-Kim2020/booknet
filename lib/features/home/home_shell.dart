@@ -8,9 +8,10 @@ class HomeShell extends StatelessWidget {
 
   static const _tabs = [
     (path: '/library', icon: Icons.menu_book, label: '내 책장'),
-    (path: '/marketplace', icon: Icons.local_offer, label: '판매'),
+    (path: '/marketplace', icon: Icons.local_offer, label: '마켓'),
     (path: '/discussion', icon: Icons.forum, label: '독서토론'),
-    (path: '/reviews', icon: Icons.rate_review, label: '한줄평'),
+    (path: '/chat', icon: Icons.chat, label: '채팅'),
+    (path: '/more', icon: Icons.more_horiz, label: '더보기'),
   ];
 
   int _currentIndex(BuildContext context) {

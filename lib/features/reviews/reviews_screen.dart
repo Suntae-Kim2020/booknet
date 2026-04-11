@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/review.dart';
 import '../../providers.dart';
 
 final recentReviewsProvider = FutureProvider<List<Review>>((ref) async {
-  return ref.read(supabaseRepoProvider).recentReviews();
+  return ref.read(reviewRepoProvider).recentReviews();
 });
 
 class ReviewsScreen extends ConsumerWidget {
@@ -86,14 +87,15 @@ class ReviewsScreen extends ConsumerWidget {
               onPressed: () async {
                 final text = ctl.text.trim();
                 if (text.isEmpty) return;
+                final uid = Supabase.instance.client.auth.currentUser?.id ?? '';
                 final review = Review(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   bookId: '', // TODO: 책 선택 UI 추가
-                  userId: 'me',
+                  userId: uid,
                   content: text,
                   createdAt: DateTime.now(),
                 );
-                await ref.read(supabaseRepoProvider).addReview(review);
+                await ref.read(reviewRepoProvider).addReview(review);
                 ref.invalidate(recentReviewsProvider);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },

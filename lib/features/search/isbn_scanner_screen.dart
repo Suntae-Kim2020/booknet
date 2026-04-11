@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../models/book.dart';
 import '../../providers.dart';
 
 class IsbnScannerScreen extends ConsumerStatefulWidget {
@@ -27,7 +29,19 @@ class _IsbnScannerScreenState extends ConsumerState<IsbnScannerScreen> {
         _handled = false;
         return;
       }
-      await ref.read(supabaseRepoProvider).upsertBook(book);
+      final uid = Supabase.instance.client.auth.currentUser?.id ?? '';
+      final bookWithOwner = Book(
+        id: book.id,
+        ownerId: uid,
+        isbn: book.isbn,
+        title: book.title,
+        author: book.author,
+        publisher: book.publisher,
+        coverUrl: book.coverUrl,
+        description: book.description,
+        publishedAt: book.publishedAt,
+      );
+      await ref.read(bookRepoProvider).upsertBook(bookWithOwner);
       _showSnack('등록: ${book.title}');
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

@@ -48,6 +48,7 @@ class NaverBookApi {
       final isbn = (m['isbn'] as String? ?? '').split(' ').last;
       return Book(
         id: isbn.isEmpty ? title : isbn,
+        ownerId: '', // 등록 시 실제 uid로 설정
         isbn: isbn,
         title: title,
         author: author,

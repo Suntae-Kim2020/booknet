@@ -7,7 +7,7 @@ import '../../models/sale_bundle.dart';
 import '../../providers.dart';
 
 final myBundlesProvider = FutureProvider<List<SaleBundle>>((ref) async {
-  return ref.read(supabaseRepoProvider).myBundles();
+  return ref.read(bundleRepoProvider).myBundles();
 });
 
 class MarketplaceScreen extends ConsumerWidget {
@@ -39,8 +39,8 @@ class MarketplaceScreen extends ConsumerWidget {
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
                   title: Text(b.title),
-                  subtitle: Text('${b.bookIds.length}권 · ${b.status}'),
-                  trailing: Text('${fmt.format(b.priceWon)}원'),
+                  subtitle: Text('${b.books.length}권 · ${b.status}'),
+                  trailing: Text('${fmt.format(b.totalPriceWon)}원'),
                 ),
               );
             },

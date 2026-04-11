@@ -1,6 +1,7 @@
 /// 책 도메인 모델
 class Book {
   final String id;
+  final String ownerId;
   final String isbn;
   final String title;
   final String author;
@@ -17,6 +18,7 @@ class Book {
 
   const Book({
     required this.id,
+    required this.ownerId,
     required this.isbn,
     required this.title,
     required this.author,
@@ -38,6 +40,7 @@ class Book {
   }) {
     return Book(
       id: id,
+      ownerId: ownerId,
       isbn: isbn,
       title: title,
       author: author,
@@ -54,6 +57,7 @@ class Book {
 
   factory Book.fromMap(Map<String, dynamic> m) => Book(
         id: m['id'] as String,
+        ownerId: m['owner_id'] as String? ?? '',
         isbn: m['isbn'] as String? ?? '',
         title: m['title'] as String? ?? '',
         author: m['author'] as String? ?? '',
@@ -73,6 +77,7 @@ class Book {
 
   Map<String, dynamic> toMap() => {
         'id': id,
+        'owner_id': ownerId,
         'isbn': isbn,
         'title': title,
         'author': author,

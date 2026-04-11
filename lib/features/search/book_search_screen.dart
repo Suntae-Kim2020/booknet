@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/book.dart';
 import '../../providers.dart';
@@ -36,7 +37,19 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
   }
 
   Future<void> _register(Book b) async {
-    await ref.read(supabaseRepoProvider).upsertBook(b);
+    final uid = Supabase.instance.client.auth.currentUser?.id ?? '';
+    final bookWithOwner = Book(
+      id: b.id,
+      ownerId: uid,
+      isbn: b.isbn,
+      title: b.title,
+      author: b.author,
+      publisher: b.publisher,
+      coverUrl: b.coverUrl,
+      description: b.description,
+      publishedAt: b.publishedAt,
+    );
+    await ref.read(bookRepoProvider).upsertBook(bookWithOwner);
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('등록: ${b.title}')));

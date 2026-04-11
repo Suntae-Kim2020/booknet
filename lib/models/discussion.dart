@@ -5,11 +5,15 @@ class Discussion {
   final String bookId;
   final String title;
   final String? description;
-  final String region; // 시/도, 시/군/구
+  final String region;
   final bool isOnline;
   final DateTime scheduledAt;
   final int maxParticipants;
   final int currentParticipants;
+  final String genderPolicy; // 'male_only' / 'female_only' / 'any'
+  final int? minAge;
+  final int? maxAge;
+  final String status; // 'open' / 'closed' / 'completed'
 
   const Discussion({
     required this.id,
@@ -22,6 +26,10 @@ class Discussion {
     required this.scheduledAt,
     this.maxParticipants = 10,
     this.currentParticipants = 1,
+    this.genderPolicy = 'any',
+    this.minAge,
+    this.maxAge,
+    this.status = 'open',
   });
 
   factory Discussion.fromMap(Map<String, dynamic> m) => Discussion(
@@ -36,6 +44,10 @@ class Discussion {
         maxParticipants: (m['max_participants'] as num?)?.toInt() ?? 10,
         currentParticipants:
             (m['current_participants'] as num?)?.toInt() ?? 1,
+        genderPolicy: m['gender_policy'] as String? ?? 'any',
+        minAge: (m['min_age'] as num?)?.toInt(),
+        maxAge: (m['max_age'] as num?)?.toInt(),
+        status: m['status'] as String? ?? 'open',
       );
 
   Map<String, dynamic> toMap() => {
@@ -49,5 +61,9 @@ class Discussion {
         'scheduled_at': scheduledAt.toIso8601String(),
         'max_participants': maxParticipants,
         'current_participants': currentParticipants,
+        'gender_policy': genderPolicy,
+        'min_age': minAge,
+        'max_age': maxAge,
+        'status': status,
       };
 }

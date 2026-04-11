@@ -17,13 +17,13 @@ class _DiscussionSearchScreenState
     extends ConsumerState<DiscussionSearchScreen> {
   final _bookCtl = TextEditingController();
   final _regionCtl = TextEditingController();
-  bool? _isOnline; // null = both
+  bool? _isOnline;
   List<Discussion> _results = [];
   bool _loading = false;
 
   Future<void> _search() async {
     setState(() => _loading = true);
-    final list = await ref.read(supabaseRepoProvider).searchDiscussions(
+    final list = await ref.read(discussionRepoProvider).searchDiscussions(
           bookQuery: _bookCtl.text.trim(),
           region: _regionCtl.text.trim(),
           isOnline: _isOnline,
