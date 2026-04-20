@@ -14,6 +14,10 @@ create table if not exists profiles (
     phone text,
     kakao_id text,
     sharing_default text default 'all',   -- 'all' / 'friends' / 'none'
+    agreed_terms boolean default false,
+    agreed_privacy boolean default false,
+    agreed_marketing boolean default false,
+    agreed_at timestamptz,
     created_at timestamptz default now(),
     updated_at timestamptz default now()
 );
@@ -35,6 +39,7 @@ create table if not exists books (
     read_at timestamptz,
     created_at timestamptz default now()
 );
+alter table books add column if not exists deleted_at timestamptz;
 create index if not exists books_owner_idx on books(owner_id);
 create index if not exists books_isbn_idx on books(isbn);
 
@@ -217,17 +222,23 @@ create policy "memos_update" on memos
 create policy "memos_delete" on memos
     for delete using (auth.uid() = user_id);
 
--- sale_bundles: 공개 읽기, 본인만 쓰기/수정
+-- sale_bundles: 공개 읽기, 본인만 쓰기/수정/삭제
 create policy "bundles_read" on sale_bundles for select using (true);
 create policy "bundles_write" on sale_bundles
     for insert with check (auth.uid() = owner_id);
 create policy "bundles_update" on sale_bundles
     for update using (auth.uid() = owner_id);
+create policy "bundles_delete" on sale_bundles
+    for delete using (auth.uid() = owner_id);
 
--- bundle_books: 공개 읽기 (꾸러미 열람), 꾸러미 소유자만 쓰기
+-- bundle_books: 공개 읽기 (꾸러미 열람), 꾸러미 소유자만 쓰기/수정/삭제
 create policy "bundle_books_read" on bundle_books for select using (true);
 create policy "bundle_books_write" on bundle_books
     for insert with check (
+        exists (select 1 from sale_bundles where id = bundle_id and owner_id = auth.uid())
+    );
+create policy "bundle_books_update" on bundle_books
+    for update using (
         exists (select 1 from sale_bundles where id = bundle_id and owner_id = auth.uid())
     );
 create policy "bundle_books_delete" on bundle_books
