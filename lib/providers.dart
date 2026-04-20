@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'services/auth_service.dart';
 import 'services/naver_book_api.dart';
@@ -16,13 +16,8 @@ import 'services/repositories/review_repository.dart';
 // ---------- Auth ----------
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-final authStateProvider = StreamProvider<User?>((ref) {
-  try {
-    return ref.watch(authServiceProvider).authStateChanges;
-  } catch (_) {
-    // Firebase 미설정 시 빈 스트림
-    return Stream.value(null);
-  }
+final authStateProvider = StreamProvider<AuthState>((ref) {
+  return ref.watch(authServiceProvider).authStateChanges;
 });
 
 // ---------- External APIs ----------

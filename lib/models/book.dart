@@ -15,6 +15,7 @@ class Book {
   final bool isForSale;
   final bool wantsDiscussion;
   final DateTime? readAt;
+  final DateTime? deletedAt;
 
   const Book({
     required this.id,
@@ -30,6 +31,7 @@ class Book {
     this.isForSale = false,
     this.wantsDiscussion = false,
     this.readAt,
+    this.deletedAt,
   });
 
   Book copyWith({
@@ -73,6 +75,9 @@ class Book {
         readAt: m['read_at'] != null
             ? DateTime.tryParse(m['read_at'] as String)
             : null,
+        deletedAt: m['deleted_at'] != null
+            ? DateTime.tryParse(m['deleted_at'] as String)
+            : null,
       );
 
   Map<String, dynamic> toMap() => {
@@ -89,5 +94,6 @@ class Book {
         'is_for_sale': isForSale,
         'wants_discussion': wantsDiscussion,
         'read_at': readAt?.toIso8601String(),
+        'deleted_at': deletedAt?.toIso8601String(),
       };
 }

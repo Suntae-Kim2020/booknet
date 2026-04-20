@@ -28,4 +28,8 @@ class ReviewRepository {
         await _db.from('reviews').insert(r.toMap()).select().single();
     return Review.fromMap(row);
   }
+
+  Future<void> deleteReview(String reviewId) async {
+    await _db.from('reviews').delete().eq('id', reviewId);
+  }
 }

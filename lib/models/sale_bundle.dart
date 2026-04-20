@@ -23,6 +23,22 @@ class SaleBundle {
   int get totalPriceWon =>
       books.fold(0, (sum, b) => sum + b.priceWon);
 
+  /// 상태 한글 표시
+  String get statusLabel {
+    switch (status) {
+      case 'listed':
+        return '판매중';
+      case 'reserved':
+        return '예약중';
+      case 'sold':
+        return '판매완료';
+      case 'hidden':
+        return '숨김';
+      default:
+        return status;
+    }
+  }
+
   factory SaleBundle.fromMap(Map<String, dynamic> m) => SaleBundle(
         id: m['id'] as String,
         ownerId: m['owner_id'] as String,

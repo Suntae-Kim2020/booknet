@@ -8,7 +8,11 @@ class Profile {
   final int? birthYear;
   final String? phone;
   final String? kakaoId;
-  final String sharingDefault; // 'all' / 'friends' / 'none'
+  final String sharingDefault;
+  final bool agreedTerms;
+  final bool agreedPrivacy;
+  final bool agreedMarketing;
+  final DateTime? agreedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -22,6 +26,10 @@ class Profile {
     this.phone,
     this.kakaoId,
     this.sharingDefault = 'all',
+    this.agreedTerms = false,
+    this.agreedPrivacy = false,
+    this.agreedMarketing = false,
+    this.agreedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -35,6 +43,10 @@ class Profile {
     String? phone,
     String? kakaoId,
     String? sharingDefault,
+    bool? agreedTerms,
+    bool? agreedPrivacy,
+    bool? agreedMarketing,
+    DateTime? agreedAt,
   }) {
     return Profile(
       id: id,
@@ -46,6 +58,10 @@ class Profile {
       phone: phone ?? this.phone,
       kakaoId: kakaoId ?? this.kakaoId,
       sharingDefault: sharingDefault ?? this.sharingDefault,
+      agreedTerms: agreedTerms ?? this.agreedTerms,
+      agreedPrivacy: agreedPrivacy ?? this.agreedPrivacy,
+      agreedMarketing: agreedMarketing ?? this.agreedMarketing,
+      agreedAt: agreedAt ?? this.agreedAt,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );
@@ -61,6 +77,12 @@ class Profile {
         phone: m['phone'] as String?,
         kakaoId: m['kakao_id'] as String?,
         sharingDefault: m['sharing_default'] as String? ?? 'all',
+        agreedTerms: (m['agreed_terms'] as bool?) ?? false,
+        agreedPrivacy: (m['agreed_privacy'] as bool?) ?? false,
+        agreedMarketing: (m['agreed_marketing'] as bool?) ?? false,
+        agreedAt: m['agreed_at'] != null
+            ? DateTime.tryParse(m['agreed_at'] as String)
+            : null,
         createdAt: DateTime.parse(m['created_at'] as String),
         updatedAt: DateTime.parse(m['updated_at'] as String),
       );
@@ -75,6 +97,10 @@ class Profile {
         'phone': phone,
         'kakao_id': kakaoId,
         'sharing_default': sharingDefault,
+        'agreed_terms': agreedTerms,
+        'agreed_privacy': agreedPrivacy,
+        'agreed_marketing': agreedMarketing,
+        'agreed_at': agreedAt?.toIso8601String(),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
