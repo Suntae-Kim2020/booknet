@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/discussion.dart';
@@ -267,14 +269,22 @@ class DiscussionRepository {
     }).toList();
   }
 
-  Future<void> sendMessage(String discussionId, String content, {String? replyTo}) async {
+  Future<void> sendMessage(String discussionId, String content, {String? replyTo, String? imageUrl}) async {
     final data = <String, dynamic>{
       'discussion_id': discussionId,
       'sender_id': _uid,
       'content': content,
     };
     if (replyTo != null) data['reply_to'] = replyTo;
+    if (imageUrl != null) data['image_url'] = imageUrl;
     await _db.from('discussion_chat').insert(data);
+  }
+
+  Future<String> uploadChatImage(String discussionId, String filePath) async {
+    final ext = filePath.split('.').last;
+    final fileName = '${discussionId}/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await _db.storage.from('chat-images').upload(fileName, File(filePath));
+    return _db.storage.from('chat-images').getPublicUrl(fileName);
   }
 
   // ---------- Book Candidates & Voting ----------

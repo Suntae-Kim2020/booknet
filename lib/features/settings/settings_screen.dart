@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../models/profile.dart';
 import '../../providers.dart';
+import '../../services/csv_export_service.dart';
 
 final myProfileProvider = FutureProvider<Profile?>((ref) async {
   return ref.read(profileRepoProvider).myProfile();
@@ -112,6 +113,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: const Text('룰렛, 주사위, 사다리타기'),
             onTap: () => context.push('/games'),
           ),
+          ListTile(
+            leading: const Icon(Icons.file_download),
+            title: const Text('데이터 내보내기'),
+            subtitle: const Text('독서기록, 메모, 한줄평 CSV'),
+            onTap: () => _showExportSheet(context),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
@@ -137,6 +144,69 @@ class SettingsScreen extends ConsumerWidget {
         return '비공개';
       default:
         return value;
+    }
+  }
+
+  void _showExportSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('데이터 내보내기 (CSV)',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.book),
+              title: const Text('내 독서기록'),
+              subtitle: const Text('읽은 책 목록, 읽기 상태, 날짜'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                _exportWithLoading(context, '독서기록', CsvExportService.exportMyBooks);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.note),
+              title: const Text('내 메모'),
+              subtitle: const Text('책별 메모 내용, 페이지, 날짜'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                _exportWithLoading(context, '메모', CsvExportService.exportMyMemos);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.star),
+              title: const Text('내 한줄평'),
+              subtitle: const Text('별점, 한줄평 내용, 날짜'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                _exportWithLoading(context, '한줄평', CsvExportService.exportMyReviews);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportWithLoading(
+      BuildContext context, String name, Future<dynamic> Function() export) async {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('$name 내보내기 중...')));
+    try {
+      final file = await export();
+      if (context.mounted) {
+        await CsvExportService.shareFile(file, context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('내보내기 실패: $e')));
+      }
     }
   }
 

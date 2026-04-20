@@ -1,11 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../providers.dart';
+import '../../services/csv_export_service.dart';
 import '../../services/notification_service.dart';
 import 'discussion_search_screen.dart';
 
@@ -588,6 +593,55 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
     }
   }
 
+  Future<void> _pickAndSendImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('카메라로 촬영'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('갤러리에서 선택'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 70, maxWidth: 1200);
+    if (picked == null) return;
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이미지 업로드 중...')));
+
+    try {
+      final repo = ref.read(discussionRepoProvider);
+      final imageUrl = await repo.uploadChatImage(widget.discussionId, picked.path);
+      await repo.sendMessage(widget.discussionId, '📷 사진', imageUrl: imageUrl);
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('이미지 전송 실패: $e')));
+    }
+  }
+
+  void _openImageViewer(BuildContext context, String url) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _ImageViewerScreen(imageUrl: url),
+    ));
+  }
+
   void _setReply(Map<String, dynamic> msg) {
     setState(() => _replyTarget = msg);
     _msgCtrl.selection = TextSelection.collapsed(offset: _msgCtrl.text.length);
@@ -645,6 +699,7 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
                       final isMine = m['sender_id'] == _uid;
                       final nick = m['nickname'] as String? ?? '?';
                       final content = m['content'] as String? ?? '';
+                      final imageUrl = m['image_url'] as String?;
                       final senderId = m['sender_id'] as String? ?? '';
                       final time = DateTime.tryParse(m['created_at'] as String? ?? '');
                       final timeStr = time != null ? DateFormat('HH:mm').format(time) : '';
@@ -684,8 +739,8 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                               child: isMine
-                                  ? _buildMyBubble(theme, content, timeStr, replyNick, replyContent)
-                                  : _buildOtherBubble(theme, nick, senderId, content, timeStr, showAvatar, replyNick, replyContent),
+                                  ? _buildMyBubble(theme, content, timeStr, replyNick, replyContent, imageUrl)
+                                  : _buildOtherBubble(theme, nick, senderId, content, timeStr, showAvatar, replyNick, replyContent, imageUrl),
                             ),
                           ),
                         ],
@@ -737,6 +792,11 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
             top: false,
             child: Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.image, size: 24),
+                  onPressed: _pickAndSendImage,
+                  color: theme.colorScheme.primary,
+                ),
                 Expanded(
                   child: TextField(
                     controller: _msgCtrl,
@@ -808,7 +868,7 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
     );
   }
 
-  Widget _buildMyBubble(ThemeData theme, String content, String timeStr, String? replyNick, String? replyContent) {
+  Widget _buildMyBubble(ThemeData theme, String content, String timeStr, String? replyNick, String? replyContent, String? imageUrl) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -830,7 +890,18 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
               children: [
                 if (replyNick != null || replyContent != null)
                   _buildReplyPreview(theme, replyNick, replyContent, true),
-                Text(content, style: const TextStyle(fontSize: 14)),
+                if (imageUrl != null)
+                  GestureDetector(
+                    onTap: () => _openImageViewer(context, imageUrl),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(imageUrl, width: 200, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
+                    ),
+                  ),
+                if (imageUrl != null && content != '📷 사진') const SizedBox(height: 4),
+                if (content != '📷 사진' || imageUrl == null)
+                  Text(content, style: const TextStyle(fontSize: 14)),
               ],
             ),
           ),
@@ -840,7 +911,7 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
   }
 
   Widget _buildOtherBubble(ThemeData theme, String nick, String senderId,
-      String content, String timeStr, bool showAvatar, String? replyNick, String? replyContent) {
+      String content, String timeStr, bool showAvatar, String? replyNick, String? replyContent, String? imageUrl) {
     final avatarColor = _colorForUid(senderId);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -883,7 +954,15 @@ class _ChatTabState extends ConsumerState<_ChatTab> {
                         children: [
                           if (replyNick != null || replyContent != null)
                             _buildReplyPreview(theme, replyNick, replyContent, false),
-                          Text(content, style: const TextStyle(fontSize: 14)),
+                          if (imageUrl != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(imageUrl, width: 200, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
+                            ),
+                          if (imageUrl != null && content != '📷 사진') const SizedBox(height: 4),
+                          if (content != '📷 사진' || imageUrl == null)
+                            Text(content, style: const TextStyle(fontSize: 14)),
                         ],
                       ),
                     ),
@@ -1343,6 +1422,18 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
     } catch (_) {}
   }
 
+  Future<void> _exportCsv(BuildContext context, String name, Future<dynamic> Function() export) async {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name 내보내기 중...')));
+    try {
+      final file = await export();
+      if (context.mounted) await CsvExportService.shareFile(file, context);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('내보내기 실패: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = widget.discussion;
@@ -1477,6 +1568,35 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         _MemberSection(discussionId: discussionId, isHost: isHost),
         const Divider(height: 32),
         _AnnouncementsSection(discussionId: discussionId, isAdmin: isAdmin),
+        if (isAdmin) ...[
+          const Divider(height: 32),
+          Text('데이터 내보내기', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.people, size: 18),
+                label: const Text('멤버 목록'),
+                onPressed: () => _exportCsv(context, '멤버목록',
+                    () => CsvExportService.exportMembers(discussionId)),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.check_circle, size: 18),
+                label: const Text('출석 현황'),
+                onPressed: () => _exportCsv(context, '출석현황',
+                    () => CsvExportService.exportAttendance(discussionId)),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.event, size: 18),
+                label: const Text('모임 이력'),
+                onPressed: () => _exportCsv(context, '모임이력',
+                    () => CsvExportService.exportMeetingHistory(discussionId)),
+              ),
+            ],
+          ),
+        ],
         if (isHost) ...[
           const Divider(height: 32),
           FilledButton.tonalIcon(
@@ -2175,6 +2295,95 @@ class _AnnouncementInputDialogState extends State<_AnnouncementInputDialog> {
           child: const Text('추가'),
         ),
       ],
+    );
+  }
+}
+
+class _ImageViewerScreen extends StatefulWidget {
+  final String imageUrl;
+  const _ImageViewerScreen({required this.imageUrl});
+
+  @override
+  State<_ImageViewerScreen> createState() => _ImageViewerScreenState();
+}
+
+class _ImageViewerScreenState extends State<_ImageViewerScreen> {
+  final _transformCtrl = TransformationController();
+
+  @override
+  void dispose() {
+    _transformCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _download() async {
+    try {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('다운로드 중...')));
+      final response = await HttpClient().getUrl(Uri.parse(widget.imageUrl));
+      final httpResponse = await response.close();
+      final bytes = await httpResponse.fold<List<int>>([], (prev, el) => prev..addAll(el));
+
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'booknet_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsBytes(bytes);
+
+      if (!mounted) return;
+      await CsvExportService.shareFile(file, context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('다운로드 실패: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('사진'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            tooltip: '다운로드',
+            onPressed: _download,
+          ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          transformationController: _transformCtrl,
+          minScale: 0.5,
+          maxScale: 5.0,
+          child: Image.network(
+            widget.imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (_, child, progress) {
+              if (progress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: progress.expectedTotalBytes != null
+                      ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                      : null,
+                  color: Colors.white,
+                ),
+              );
+            },
+            errorBuilder: (_, __, ___) => const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                SizedBox(height: 8),
+                Text('이미지를 불러올 수 없습니다', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
