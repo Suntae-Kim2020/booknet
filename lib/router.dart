@@ -9,14 +9,21 @@ import 'features/library/library_screen.dart';
 import 'features/search/book_search_screen.dart';
 import 'features/search/isbn_scanner_screen.dart';
 import 'features/marketplace/marketplace_screen.dart';
+import 'features/marketplace/bundle_detail_screen.dart';
 import 'features/marketplace/bundle_edit_screen.dart';
+import 'features/discussion/discussion_create_screen.dart';
+import 'features/discussion/discussion_detail_screen.dart';
+import 'features/discussion/discussion_home_screen.dart';
 import 'features/discussion/discussion_search_screen.dart';
+import 'features/games/game_list_screen.dart';
+import 'features/games/roulette_screen.dart';
+import 'features/games/dice_screen.dart';
+import 'features/games/ladder_screen.dart';
 import 'features/reviews/reviews_screen.dart';
 import 'features/book_detail/book_detail_screen.dart';
 import 'features/memo/memo_list_screen.dart';
 import 'features/memo/memo_edit_screen.dart';
 import 'features/memo/memo_search_screen.dart';
-import 'features/book_photo/book_photo_screen.dart';
 import 'features/chat/chat_list_screen.dart';
 import 'features/chat/chat_room_screen.dart';
 import 'features/notifications/notification_list_screen.dart';
@@ -30,12 +37,15 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/library',
     redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
-      final isAuthRoute = state.uri.path == '/login' ||
-          state.uri.path == '/profile/setup';
+      if (authState.isLoading) return null;
+
+      final session = authState.valueOrNull?.session;
+      final isLoggedIn = session != null;
+      final path = state.uri.path;
+      final isAuthRoute = path == '/login' || path == '/profile/setup';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && state.uri.path == '/login') return '/library';
+      if (isLoggedIn && path == '/login') return '/library';
       return null;
     },
     routes: [
@@ -82,10 +92,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const IsbnScannerScreen(),
       ),
       GoRoute(
-        path: '/photo',
-        builder: (context, state) => const BookPhotoScreen(),
-      ),
-      GoRoute(
         path: '/memos/search',
         builder: (context, state) => const MemoSearchScreen(),
       ),
@@ -114,10 +120,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/bundle/edit',
         builder: (context, state) => const BundleEditScreen(),
       ),
+      GoRoute(
+        path: '/bundle/:id',
+        builder: (context, state) =>
+            BundleDetailScreen(bundleId: state.pathParameters['id']!),
+      ),
       // 한줄평
       GoRoute(
         path: '/reviews',
         builder: (context, state) => const ReviewsScreen(),
+      ),
+      GoRoute(
+        path: '/discussion/create',
+        builder: (context, state) => const DiscussionCreateScreen(),
+      ),
+      GoRoute(
+        path: '/discussion/:id',
+        builder: (context, state) =>
+            DiscussionDetailScreen(discussionId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/discussion/:id/home',
+        builder: (context, state) =>
+            DiscussionHomeScreen(discussionId: state.pathParameters['id']!),
       ),
       // 채팅
       GoRoute(
@@ -134,6 +159,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      // 게임
+      GoRoute(
+        path: '/games',
+        builder: (context, state) => const GameListScreen(),
+      ),
+      GoRoute(
+        path: '/games/roulette',
+        builder: (context, state) => const RouletteScreen(),
+      ),
+      GoRoute(
+        path: '/games/dice',
+        builder: (context, state) => const DiceScreen(),
+      ),
+      GoRoute(
+        path: '/games/ladder',
+        builder: (context, state) => const LadderScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
