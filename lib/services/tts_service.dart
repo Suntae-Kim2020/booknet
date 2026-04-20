@@ -23,5 +23,17 @@ class TtsService {
     await _tts.speak(text);
   }
 
+  /// 여러 텍스트를 순차적으로 읽기
+  Future<void> speakAll(List<String> texts) async {
+    if (!_ready) await _init();
+    await _tts.stop();
+    final joined = texts
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .join('. ');
+    if (joined.isEmpty) return;
+    await _tts.speak(joined);
+  }
+
   Future<void> stop() => _tts.stop();
 }

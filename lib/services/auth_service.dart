@@ -1,105 +1,115 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
-import 'package:flutter_naver_login/flutter_naver_login.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supa;
-import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Firebase Auth + Supabase 세션 동기화
+/// Supabase Auth 기반 인증 서비스
 class AuthService {
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-  final Dio _dio = Dio();
+  SupabaseClient get _supabase => Supabase.instance.client;
 
-  supa.SupabaseClient get _supabase => supa.Supabase.instance.client;
+  User? get currentUser => _supabase.auth.currentUser;
+  bool get isLoggedIn => _supabase.auth.currentUser != null;
 
-  User? get currentUser => _firebaseAuth.currentUser;
-  bool get isLoggedIn => _firebaseAuth.currentUser != null;
-
-  Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
+  Stream<AuthState> get authStateChanges =>
+      _supabase.auth.onAuthStateChange;
 
   // ---------- Google ----------
   Future<void> signInWithGoogle() async {
-    final googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) return;
-    final googleAuth = await googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
+    final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'] ?? '';
+
+    final googleSignIn = GoogleSignIn(
+      serverClientId: webClientId.isNotEmpty ? webClientId : null,
     );
-    await _firebaseAuth.signInWithCredential(credential);
-    await _syncSupabaseSession();
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) throw Exception('Google 로그인이 취소되었습니다');
+
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+
+    if (idToken == null) throw Exception('Google ID 토큰을 가져올 수 없습니다');
+
+    await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
   }
 
   // ---------- Kakao ----------
   Future<void> signInWithKakao() async {
-    kakao.OAuthToken token;
-    if (await kakao.isKakaoTalkInstalled()) {
-      token = await kakao.UserApi.instance.loginWithKakaoTalk();
-    } else {
-      token = await kakao.UserApi.instance.loginWithKakaoAccount();
-    }
-    // Firebase Custom Token 발급 (Supabase Edge Function)
-    final firebaseToken = await _exchangeKakaoToken(token.accessToken);
-    await _firebaseAuth.signInWithCustomToken(firebaseToken);
-    await _syncSupabaseSession();
+    await _supabase.auth.signInWithOAuth(
+      OAuthProvider.kakao,
+      redirectTo: 'io.booknet.booknet://login-callback',
+      scopes: 'profile_nickname',
+      authScreenLaunchMode: LaunchMode.externalApplication,
+    );
   }
 
   // ---------- Naver ----------
   Future<void> signInWithNaver() async {
-    final result = await FlutterNaverLogin.logIn();
-    if (result.status != NaverLoginStatus.loggedIn) return;
-    final accessToken = result.accessToken.accessToken;
-    // Firebase Custom Token 발급 (Supabase Edge Function)
-    final firebaseToken = await _exchangeNaverToken(accessToken);
-    await _firebaseAuth.signInWithCustomToken(firebaseToken);
-    await _syncSupabaseSession();
+    final clientId = dotenv.env['NAVER_CLIENT_ID'] ?? '';
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final callbackUrl = '$supabaseUrl/functions/v1/auth-naver-callback';
+    final redirectUri = Uri.encodeComponent(callbackUrl);
+    final state = DateTime.now().millisecondsSinceEpoch.toString();
+
+    final authUrl =
+        'https://nid.naver.com/oauth2.0/authorize'
+        '?response_type=code'
+        '&client_id=$clientId'
+        '&redirect_uri=$redirectUri'
+        '&state=$state';
+
+    // ASWebAuthenticationSession으로 OAuth 처리
+    // Edge Function이 io.booknet.booknet:// 으로 리다이렉트하면 자동 캡처
+    final resultUrl = await FlutterWebAuth2.authenticate(
+      url: authUrl,
+      callbackUrlScheme: 'io.booknet.booknet',
+    );
+
+    final uri = Uri.parse(resultUrl);
+    final error = uri.queryParameters['error'];
+    if (error != null) {
+      throw Exception('네이버 로그인 실패: $error');
+    }
+
+    final naverToken = uri.queryParameters['naver_token'];
+    if (naverToken == null) {
+      throw Exception('네이버 로그인에 실패했습니다');
+    }
+
+    // Edge Function으로 세션 즉시 생성
+    final res = await _supabase.functions.invoke(
+      'auth-naver',
+      body: {'access_token': naverToken},
+    );
+
+    if (res.status != 200) {
+      throw Exception(res.data['error'] ?? '네이버 로그인 처리에 실패했습니다');
+    }
+
+    final refreshToken = res.data['refresh_token'] as String;
+    await _supabase.auth.setSession(refreshToken);
   }
 
   // ---------- Sign Out ----------
   Future<void> signOut() async {
-    await _firebaseAuth.signOut();
     await _supabase.auth.signOut();
     try {
       await GoogleSignIn().signOut();
     } catch (_) {}
+  }
+
+  /// 프로필 존재 여부 확인 (첫 로그인 판단)
+  Future<bool> hasProfile() async {
+    final uid = currentUser?.id;
+    if (uid == null) return false;
     try {
-      await FlutterNaverLogin.logOut();
-    } catch (_) {}
-  }
-
-  // ---------- Internal ----------
-
-  /// Firebase ID 토큰 → Supabase Edge Function → Supabase 세션
-  Future<void> _syncSupabaseSession() async {
-    final idToken = await _firebaseAuth.currentUser?.getIdToken();
-    if (idToken == null) return;
-
-    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-    final res = await _dio.post(
-      '$supabaseUrl/functions/v1/auth-firebase',
-      data: {'id_token': idToken},
-    );
-
-    final accessToken = res.data['access_token'] as String;
-    await _supabase.auth.setSession(accessToken);
-  }
-
-  Future<String> _exchangeKakaoToken(String kakaoAccessToken) async {
-    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-    final res = await _dio.post(
-      '$supabaseUrl/functions/v1/auth-kakao',
-      data: {'access_token': kakaoAccessToken},
-    );
-    return res.data['firebase_token'] as String;
-  }
-
-  Future<String> _exchangeNaverToken(String naverAccessToken) async {
-    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-    final res = await _dio.post(
-      '$supabaseUrl/functions/v1/auth-naver',
-      data: {'access_token': naverAccessToken},
-    );
-    return res.data['firebase_token'] as String;
+      final rows = await _supabase.from('profiles').select('id').eq('id', uid);
+      return (rows as List).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 }
