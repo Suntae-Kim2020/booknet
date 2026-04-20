@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/book.dart';
 import '../../providers.dart';
+import '../library/library_screen.dart';
 
 class IsbnScannerScreen extends ConsumerStatefulWidget {
   const IsbnScannerScreen({super.key});
@@ -42,6 +43,7 @@ class _IsbnScannerScreenState extends ConsumerState<IsbnScannerScreen> {
         publishedAt: book.publishedAt,
       );
       await ref.read(bookRepoProvider).upsertBook(bookWithOwner);
+      ref.invalidate(myBooksProvider);
       _showSnack('등록: ${book.title}');
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../providers.dart';
 
@@ -22,9 +21,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await loginFn();
-      if (mounted) context.go('/library');
+      // OAuth는 브라우저를 열고 바로 리턴됨.
+      // 로그인 완료 후 authStateChanges → router redirect가 자동 처리.
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

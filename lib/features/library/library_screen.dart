@@ -6,6 +6,8 @@ import '../../models/book.dart';
 import '../../providers.dart';
 
 final myBooksProvider = FutureProvider<List<Book>>((ref) async {
+  // auth 상태 변경 시 자동 재조회
+  ref.watch(authStateProvider);
   return ref.read(bookRepoProvider).myBooks();
 });
 
@@ -42,11 +44,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         title: const Text('내 책장'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.camera_alt),
-            tooltip: '표지 촬영',
-            onPressed: () => context.push('/photo'),
-          ),
-          IconButton(
             icon: const Icon(Icons.qr_code_scanner),
             tooltip: 'ISBN 스캔',
             onPressed: () => context.push('/scan'),
@@ -79,21 +76,26 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
           // 책 목록
           Expanded(
-            child: books.when(
+            child: RefreshIndicator(
+              onRefresh: () async => ref.invalidate(myBooksProvider),
+              child: books.when(
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('오류: $e')),
               data: (allBooks) {
                 final list = _applyFilter(allBooks);
                 if (list.isEmpty) {
-                  return Center(
-                    child: Text(
-                      allBooks.isEmpty
-                          ? '등록된 책이 없습니다.\n오른쪽 위에서 검색/스캔으로 등록하세요.'
-                          : '이 필터에 해당하는 책이 없습니다.',
-                      textAlign: TextAlign.center,
+                  return ListView(children: [
+                    const SizedBox(height: 200),
+                    Center(
+                      child: Text(
+                        allBooks.isEmpty
+                            ? '등록된 책이 없습니다.\n오른쪽 위에서 검색/스캔으로 등록하세요.'
+                            : '이 필터에 해당하는 책이 없습니다.',
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  );
+                  ]);
                 }
                 return ListView.separated(
                   itemCount: list.length,
@@ -120,6 +122,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   },
                 );
               },
+            ),
             ),
           ),
         ],

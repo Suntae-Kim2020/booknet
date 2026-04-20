@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/memo.dart';
 import '../../providers.dart';
@@ -22,10 +23,24 @@ class MemoListScreen extends ConsumerWidget {
     final memos = ref.watch(bookMemosProvider(bookId));
     final tts = ref.read(ttsServiceProvider);
     final df = DateFormat('yyyy-MM-dd HH:mm');
+    final myUid = Supabase.instance.client.auth.currentUser?.id;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(bookTitle != null ? '$bookTitle 메모' : '메모'),
+        actions: [
+          memos.maybeWhen(
+            data: (list) => list.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.play_circle_outline),
+                    tooltip: '전체 듣기',
+                    onPressed: () => tts.speakAll(
+                        list.map((m) => m.content).toList()),
+                  )
+                : const SizedBox.shrink(),
+            orElse: () => const SizedBox.shrink(),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/book/$bookId/memo/edit'),
@@ -43,11 +58,13 @@ class MemoListScreen extends ConsumerWidget {
             itemCount: list.length,
             itemBuilder: (context, i) {
               final m = list[i];
+              final isMine = myUid != null && m.userId == myUid;
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: InkWell(
-                  onTap: () => context.push('/book/$bookId/memo/edit',
-                      extra: m),
+                  onTap: isMine
+                      ? () => context.push('/book/$bookId/memo/edit', extra: m)
+                      : null,
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
@@ -86,8 +103,16 @@ class MemoListScreen extends ConsumerWidget {
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 20),
-                              tooltip: '삭제',
+                              tooltip: isMine ? '삭제' : '본인 메모만 삭제할 수 있어요',
+                              color: isMine ? null : Colors.grey,
                               onPressed: () async {
+                                if (!isMine) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content:
+                                              Text('본인이 작성한 메모만 삭제할 수 있습니다.')));
+                                  return;
+                                }
                                 final confirmed = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
@@ -108,11 +133,19 @@ class MemoListScreen extends ConsumerWidget {
                                   ),
                                 );
                                 if (confirmed == true) {
-                                  await ref
-                                      .read(memoRepoProvider)
-                                      .deleteMemo(m.id);
-                                  ref.invalidate(
-                                      bookMemosProvider(bookId));
+                                  try {
+                                    await ref
+                                        .read(memoRepoProvider)
+                                        .deleteMemo(m.id);
+                                    ref.invalidate(
+                                        bookMemosProvider(bookId));
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(SnackBar(
+                                              content: Text('삭제 실패: $e')));
+                                    }
+                                  }
                                 }
                               },
                             ),

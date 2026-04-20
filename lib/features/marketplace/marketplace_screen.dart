@@ -7,6 +7,7 @@ import '../../models/sale_bundle.dart';
 import '../../providers.dart';
 
 final myBundlesProvider = FutureProvider<List<SaleBundle>>((ref) async {
+  ref.watch(authStateProvider);
   return ref.read(bundleRepoProvider).myBundles();
 });
 
@@ -39,8 +40,9 @@ class MarketplaceScreen extends ConsumerWidget {
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
                   title: Text(b.title),
-                  subtitle: Text('${b.books.length}권 · ${b.status}'),
+                  subtitle: Text('${b.books.length}권 · ${b.statusLabel}'),
                   trailing: Text('${fmt.format(b.totalPriceWon)}원'),
+                  onTap: () => context.push('/bundle/${b.id}'),
                 ),
               );
             },

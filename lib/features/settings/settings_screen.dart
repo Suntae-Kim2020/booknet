@@ -22,18 +22,56 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           // 프로필 헤더
           profile.when(
-            loading: () => const SizedBox(height: 80),
+            loading: () => const SizedBox(height: 100),
             error: (_, __) => const SizedBox.shrink(),
-            data: (p) => ListTile(
-              leading: CircleAvatar(
-                child: Text(p?.nickname?.isNotEmpty == true
-                    ? p!.nickname![0]
-                    : '?'),
+            data: (p) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    child: Text(
+                      p?.nickname?.isNotEmpty == true ? p!.nickname![0] : '?',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p?.nickname ?? '닉네임 없음',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        if ((p?.region ?? '').isNotEmpty)
+                          Text(p!.region!, style: const TextStyle(color: Colors.grey)),
+                        if (p?.gender != null || p?.birthYear != null)
+                          Text(
+                            [
+                              if (p?.gender == 'male') '남성',
+                              if (p?.gender == 'female') '여성',
+                              if (p?.birthYear != null) '${p!.birthYear}년생',
+                            ].join(' · '),
+                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                      ],
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      await context.push('/profile/setup');
+                      ref.invalidate(myProfileProvider);
+                    },
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('수정'),
+                  ),
+                ],
               ),
-              title: Text(p?.nickname ?? '닉네임 없음'),
-              subtitle: Text(p?.region ?? ''),
-              trailing: const Icon(Icons.edit),
-              onTap: () => context.push('/profile/setup'),
             ),
           ),
           const Divider(),
@@ -67,6 +105,12 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () => _showSharingDialog(context, ref, p),
               );
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.sports_esports),
+            title: const Text('게임'),
+            subtitle: const Text('룰렛, 주사위, 사다리타기'),
+            onTap: () => context.push('/games'),
           ),
           const Divider(),
           ListTile(
